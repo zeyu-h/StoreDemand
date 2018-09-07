@@ -11,51 +11,6 @@ def timer(title):
 
 magic_number = 1.01
 
-def poly2d(x1, x2, coeff):
-    y = coeff[0] + coeff[1]*x1 + coeff[2]*x2 + coeff[3]*x1**2 + coeff[4]*x2**2 + coeff[5]*x1*x2
-    return y
-
-
-def r2_explained(x1, x2, y):
-    x1 = x1.flatten()
-    x2 = x2.flatten()
-    A = np.array([x1*0+1, x1, x2, x1**2, x2**2, x1*x2]).T
-    y = y.flatten()
-    coeff, r, rank, s = np.linalg.lstsq(A, y)
-    r2 = 1 - r / (y.size * y.var())
-    return coeff, r2
-
-
-def month_year_factor(df, grand_avg):
-    factors_dict = {}
-    min_r2_val = 1.
-    min_r2_key = ''
-    max_r2_val = 0.
-    max_r2_key = ''
-    item_store_year_month = df.groupby(['item', 'store', 'year', 'month']).agg({'sales': 'mean'})
-    for item in df['item'].unique():
-        for store in df['store'].unique():
-            x1 = np.array(item_store_year_month.loc[(item, store)].index.get_level_values('year'))
-            x2 = np.array(item_store_year_month.loc[(item, store)].index.get_level_values('month'))
-            y = np.array(item_store_year_month.loc[(item, store), 'sales'])
-            coeff, r2 = r2_explained(x1, x2, y)
-            factors_dict[(item, store)] = coeff, r2
-            if r2 < min_r2_val:
-                min_r2_val = r2
-                min_r2_key = 'item %d, store %d, min r2 = %.4f' % (item, store, r2)
-            if r2 > max_r2_val:
-                max_r2_val = r2
-                max_r2_key = 'item %d, store %d, max r2 = %.4f' % (item, store, r2)
-    print(min_r2_key)
-    print(max_r2_key)
-    return factors_dict
-
-
-def year_month_lookup(item, store, year, month, factor_dict):
-    coeff, _ = factor_dict[(item, store)]
-    return poly2d(year, month, coeff)
-
-
 def store_item_factor(df):
     store_item_table = pd.pivot_table(df, index='store', columns='item',
                                   values='sales', aggfunc=np.mean)
