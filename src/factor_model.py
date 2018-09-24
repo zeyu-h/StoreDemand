@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 import time
 from contextlib import contextmanager
-import datetime
 
 @contextmanager
 def timer(title):
@@ -12,21 +11,23 @@ def timer(title):
 
 magic_number = 1.00
 
-
-def week_number(d):
-    return (datetime.date(d.year, d.month, d.day) - datetime.date(d.year, 1, 1)).days // 7 + 1
-
-
-# predict week day effect, based on week number and item. the trend within a year is caught here
-def weekday_effect(df, grand_avg):
-    week_weekday_table = df.groupby(['week', 'weekday']).agg({'sales':'mean'})/grand_avg
-    return week_weekday_table
-
-
 def store_item_factor(df):
     store_item_table = pd.pivot_table(df, index='store', columns='item',
                                   values='sales', aggfunc=np.mean)
     return store_item_table
+
+
+def month_effect(df, grand_avg):
+    month_table = pd.pivot_table(df, index='month', values='sales', aggfunc=np.mean)
+    month_table.sales /= grand_avg
+    return month_table
+
+
+    # Day of week pattern
+def weekday_effect(df, grand_avg):
+    weekday_table = pd.pivot_table(df, index='weekday', values='sales', aggfunc=np.mean)
+    weekday_table.sales /= grand_avg
+    return weekday_table
 
 
 def year_effect(df, grand_avg, decay_factor):
@@ -68,10 +69,10 @@ def improved_factor(df, cut_off_year):
 def factor_predictor(test, submission, store_item_table, month_table, weekday_table, annual_growth, round=True):
     submission[['sales']] = submission[['sales']].astype(np.float64)
     for _, row in test.iterrows():
-        dow, week, month, year = row.weekday, row.week, row.month, row.year
+        dow, month, year = row.weekday, row.month, row.year
         item, store = row['item'], row['store']
         base_sales = store_item_table.at[store, item]
-        mul = weekday_table.at[(week, dow), 'sales']
+        mul = month_table.at[month, 'sales'] * weekday_table.at[dow, 'sales']
         pred_sales = base_sales * mul * annual_growth(year) * magic_number
         submission.at[row['id'], 'sales'] = pred_sales
 
@@ -105,11 +106,11 @@ def sales_train_test():
 
     def expand_df(df):
         df['date'] = pd.to_datetime(df['date'])
-        df['week'] = df['date'].apply(lambda x: week_number(x))
         df['weekday'] = df['date'].dt.weekday
         df['year'] = df['date'].dt.year
         df['month'] = df['date'].dt.month
         df['year'] = df['year']
+        #df = df[df['month']<6]
         return df
     return expand_df(train_df), expand_df(test_df)
 
